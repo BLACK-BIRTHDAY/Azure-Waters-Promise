@@ -38,7 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import com.ainovel.local.ui.localization.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +66,7 @@ import com.ainovel.local.data.remote.ReasoningStrength
 import com.ainovel.local.data.remote.ProviderModel
 import kotlinx.serialization.json.Json
 import com.ainovel.local.ui.AppViewModel
+import com.ainovel.local.ui.localization.AppLanguage
 import com.ainovel.local.ui.components.PrimaryAction
 import com.ainovel.local.ui.components.SecondaryAction
 import com.ainovel.local.ui.components.SectionHeader
@@ -78,7 +79,11 @@ import java.util.Locale
 private val ProviderModelJson = Json { ignoreUnknownKeys = true }
 
 @Composable
-fun SettingsScreen(viewModel: AppViewModel) {
+fun SettingsScreen(
+    viewModel: AppViewModel,
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
+) {
     val workspace by viewModel.workspace.collectAsStateWithLifecycle()
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val models by viewModel.allModels.collectAsStateWithLifecycle()
@@ -110,6 +115,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 },
             )
         }
+        item { LanguageSection(language, onLanguageChange) }
         item { ProviderSection(viewModel, providers, busy) }
         if (workspace.novel != null) {
             item { TaskModelsSection(viewModel, models) }
@@ -127,6 +133,40 @@ fun SettingsScreen(viewModel: AppViewModel) {
             item { InstructionSection(viewModel) }
         }
         item { BackupSection(viewModel, rollbackAvailable, busy) }
+    }
+}
+
+@Composable
+private fun LanguageSection(
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(18.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionHeader(
+                "语言",
+                description = "切换后立即应用，并会记住你的选择。",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterChip(
+                    selected = language == AppLanguage.SIMPLIFIED_CHINESE,
+                    onClick = { onLanguageChange(AppLanguage.SIMPLIFIED_CHINESE) },
+                    label = {
+                        androidx.compose.material3.Text(
+                            if (language == AppLanguage.SIMPLIFIED_CHINESE) "简体中文" else "Simplified Chinese",
+                        )
+                    },
+                )
+                FilterChip(
+                    selected = language == AppLanguage.ENGLISH,
+                    onClick = { onLanguageChange(AppLanguage.ENGLISH) },
+                    label = { androidx.compose.material3.Text("English") },
+                )
+            }
+        }
     }
 }
 
