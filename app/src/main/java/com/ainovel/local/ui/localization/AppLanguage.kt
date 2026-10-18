@@ -497,9 +497,50 @@ private val exactEnglish = mapOf(
     "服务账号 JSON 缺少有效的 private_key（需包含 PEM 格式私钥）" to "Service account JSON missing valid private_key (must contain PEM format private key)",
     "OAuth2 响应缺少 access_token" to "OAuth2 response missing access_token",
     "Google OAuth2 返回缺失 access_token" to "Google OAuth2 response missing access_token",
+    "灵感内容已复制到剪贴板" to "Idea copied to clipboard",
+    "保存灵感失败" to "Could not save idea",
+    "请输入给自己看的名字" to "Please enter a private name",
+    "请输入灵感内容" to "Please enter idea content",
+    "请先选择作品" to "Please select a story first",
+    "已收入灵感素材库，可在“记忆 · 灵感素材”中查看" to "Saved to idea library. View in “Memory · Ideas”",
+    "已加入本作世界书，将陪伴下一次创作" to "Added to story world book; will accompany the next generation",
+    "已加入本作预设，将陪伴下一次创作" to "Added to story presets; will accompany the next generation",
+    "已存入本作，暂未启用" to "Saved to story, currently disabled",
+    "填入本章要求失败" to "Could not apply chapter requirement",
+    "请输入本次创作要求" to "Please enter a writing request",
+    "请输入世界书条目名称" to "Please enter a world book entry name",
+    "已填入本章创作要求，并同步加入本作世界书" to "Applied as chapter writing request and added to story world book",
+    "已填入本章创作要求" to "Applied as chapter writing request",
+    "复制" to "Copy",
+    "收入灵感库" to "Save to idea library",
+    "用作本章要求" to "Use as chapter request",
+    "收入灵感资料库" to "Save to Idea Library",
+    "经你确认后才会保存。你可以先删减或修改内容，再选择存放到全局灵感素材库或直接加入本作世界书。" to "Saved only after your confirmation. You can edit or trim content before saving to the global idea library or adding directly to this story's world book.",
+    "灵感素材库（全局）" to "Idea library (Global)",
+    "本作世界书（直接用于下一章）" to "Story world book (For next chapter)",
+    "灵感内容（可编辑裁剪）" to "Idea content (editable)",
+    "确认收入" to "Confirm and save",
+    "用作本章创作要求" to "Use as Chapter Request",
+    "确认后会将以下内容填入写作页的“本次创作要求”，并可同时加入本作世界书陪伴下一章创作。" to "After confirmation, this will be filled into Writing Request on the write tab, and can optionally join the story world book for the next chapter.",
+    "本次创作要求（可编辑裁剪）" to "Writing request (editable)",
+    "同时加入本作世界书" to "Also add to story world book",
+    "世界书条目名称" to "World book entry name",
+    "确认并前往写作" to "Confirm and start writing",
 )
 
 private fun translateDynamicText(source: String): String {
+    Regex("""^灵感记录 #(\d+)$""").matchEntire(source)?.let {
+        return "Idea record #${it.groupValues[1]}"
+    }
+    Regex("""^下一章灵感 #(\d+)$""").matchEntire(source)?.let {
+        return "Next chapter idea #${it.groupValues[1]}"
+    }
+    Regex("""^保存灵感失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not save idea: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
+    Regex("""^填入本章要求失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not apply chapter requirement: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
     Regex("""^已加载服务账号：(.+)（项目：(.+)）$""").matchEntire(source)?.let {
         return "Loaded service account: ${it.groupValues[1]} (project: ${it.groupValues[2]})"
     }
@@ -620,6 +661,10 @@ private fun translateDynamicText(source: String): String {
         "删除条目失败" to "Could not delete the entry",
         "复制条目失败" to "Could not copy the entry",
         "调整顺序失败" to "Could not change the order",
+        "保存灵感失败" to "Could not save idea",
+        "填入本章要求失败" to "Could not apply chapter requirement",
+        "灵感记录 #" to "Idea record #",
+        "下一章灵感 #" to "Next chapter idea #",
         "连接验证失败" to "Connection verification failed",
         "刷新模型失败" to "Could not refresh models",
         "验证手动模型失败" to "Manual model verification failed",

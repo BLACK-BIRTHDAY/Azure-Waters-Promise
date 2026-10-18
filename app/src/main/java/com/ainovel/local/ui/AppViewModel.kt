@@ -832,6 +832,82 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _messages.emit(UiMessage.Info("这段对话和相关记录已经清空"))
     }
 
+    fun notifyCopiedToClipboard(message: String = "灵感内容已复制到剪贴板") {
+        viewModelScope.launch {
+            _messages.emit(UiMessage.Info(message))
+        }
+    }
+
+    fun saveAssistantIdea(
+        name: String,
+        content: String,
+        scope: EntryScope,
+        type: EntryType = EntryType.WORLDBOOK,
+        enabledForNovel: Boolean = true,
+    ) = launchAction("保存灵感失败") {
+        require(name.trim().isNotEmpty()) { "请输入给自己看的名字" }
+        require(content.trim().isNotEmpty()) { "请输入灵感内容" }
+        val novelId = if (scope == EntryScope.NOVEL) {
+            requireNotNull(selectedNovelId.value) { "请先选择作品" }
+        } else {
+            null
+        }
+        val entry = ContextEntryEntity(
+            type = type,
+            scope = scope,
+            novelId = novelId,
+            name = name.trim(),
+            content = content.trim(),
+            enabled = if (scope == EntryScope.NOVEL) enabledForNovel else false,
+            sortOrder = System.currentTimeMillis(),
+        )
+        novelRepository.upsertContextEntry(entry)
+        val infoMessage = when {
+            scope == EntryScope.GLOBAL -> "已收入灵感素材库，可在“记忆 · 灵感素材”中查看"
+            scope == EntryScope.NOVEL && enabledForNovel -> {
+                if (type == EntryType.PRESET) "已加入本作预设，将陪伴下一次创作"
+                else "已加入本作世界书，将陪伴下一次创作"
+            }
+            else -> "已存入本作，暂未启用"
+        }
+        _messages.emit(UiMessage.Info(infoMessage))
+    }
+
+    fun applyAssistantIdeaAsRequirement(
+        requirementText: String,
+        alsoAddToNovelWorldbook: Boolean = false,
+        worldbookName: String = "",
+        navigateToWorkspace: Boolean = true,
+    ) = launchAction("填入本章要求失败") {
+        require(requirementText.trim().isNotEmpty()) { "请输入本次创作要求" }
+        if (alsoAddToNovelWorldbook) {
+            require(worldbookName.trim().isNotEmpty()) { "请输入世界书条目名称" }
+            val novelId = requireNotNull(selectedNovelId.value) { "请先选择作品" }
+            novelRepository.upsertContextEntry(
+                ContextEntryEntity(
+                    type = EntryType.WORLDBOOK,
+                    scope = EntryScope.NOVEL,
+                    novelId = novelId,
+                    name = worldbookName.trim(),
+                    content = requirementText.trim(),
+                    enabled = true,
+                    sortOrder = System.currentTimeMillis(),
+                ),
+            )
+        }
+        creativeRequirement.value = requirementText.trim()
+        candidatePanelExpanded.value = false
+        if (navigateToWorkspace) {
+            destination.value = AppDestination.WORKSPACE
+        }
+        val infoMessage = if (alsoAddToNovelWorldbook) {
+            "已填入本章创作要求，并同步加入本作世界书"
+        } else {
+            "已填入本章创作要求"
+        }
+        _messages.emit(UiMessage.Info(infoMessage))
+    }
+
     fun undoAcceptance(acceptanceId: String) = launchAction("撤销接受失败") {
         when (val result = novelRepository.undoAcceptance(acceptanceId)) {
             com.ainovel.local.domain.UndoAcceptResult.Success -> _messages.emit(UiMessage.Info("这次续写已从正文中撤回，创作记录仍然保留"))
