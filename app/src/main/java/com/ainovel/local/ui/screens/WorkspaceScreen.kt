@@ -128,6 +128,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
     var chapterRailExpanded by rememberSaveable { mutableStateOf(false) }
     var manuscriptFocused by remember { mutableStateOf(false) }
     val hideDockForManuscriptKeyboard = manuscriptFocused && imeVisible
+    val activeGroup = state.activeGroups.firstOrNull()
 
     if (expanded) {
         Row(Modifier.fillMaxSize()) {
@@ -160,7 +161,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                     chaptersExpanded = chapterRailExpanded,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
-                if ((state.candidates.isEmpty() || !candidatePanelExpanded) && !hideDockForManuscriptKeyboard) {
+                if ((state.candidates.isEmpty() || !candidatePanelExpanded || activeGroup == null) && !hideDockForManuscriptKeyboard) {
                     GenerationDock(
                         requirement = requirement,
                         onRequirementChange = { viewModel.creativeRequirement.value = it },
@@ -174,14 +175,14 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                         onCreateNextChapter = viewModel::createNextChapterAndInspect,
                         pendingCandidateCount = state.candidates.size,
                         onShowCandidates = viewModel::showCandidatePanel,
-                        onDeleteAllCandidates = { state.activeGroups.firstOrNull()?.let { viewModel.deleteAllCandidates(it.id) } },
+                        onDeleteAllCandidates = { activeGroup?.let { viewModel.deleteAllCandidates(it.id) } },
                     )
                 }
             }
-            if (state.candidates.isNotEmpty() && candidatePanelExpanded) {
+            if (activeGroup != null && state.candidates.isNotEmpty() && candidatePanelExpanded) {
                 VerticalDivider()
                 CandidatePanel(
-                    group = state.activeGroups.first(),
+                    group = activeGroup,
                     candidates = state.candidates,
                     onEdit = viewModel::editCandidate,
                     onRoll = viewModel::roll,
@@ -189,15 +190,15 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                     onAccept = viewModel::acceptCandidate,
                     onStop = viewModel::stopGeneration,
                     onBackToPrompt = viewModel::hideCandidatePanel,
-                    streamReasoning = if (state.activeGroups.first().taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
+                    streamReasoning = if (activeGroup.taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
                     busy = busy,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
-    } else if (shortViewport && state.candidates.isNotEmpty() && candidatePanelExpanded) {
+    } else if (shortViewport && activeGroup != null && state.candidates.isNotEmpty() && candidatePanelExpanded) {
         CandidatePanel(
-            group = state.activeGroups.first(),
+            group = activeGroup,
             candidates = state.candidates,
             onEdit = viewModel::editCandidate,
             onRoll = viewModel::roll,
@@ -205,7 +206,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
             onAccept = viewModel::acceptCandidate,
             onStop = viewModel::stopGeneration,
             onBackToPrompt = viewModel::hideCandidatePanel,
-            streamReasoning = if (state.activeGroups.first().taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
+            streamReasoning = if (activeGroup.taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
             busy = busy,
             modifier = Modifier.fillMaxSize(),
         )
@@ -223,7 +224,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                 )
             }
             AnimatedVisibility(
-                visible = (state.candidates.isEmpty() || !candidatePanelExpanded) && !hideDockForManuscriptKeyboard,
+                visible = (state.candidates.isEmpty() || !candidatePanelExpanded || activeGroup == null) && !hideDockForManuscriptKeyboard,
                 enter = fadeIn(tween(160)) + slideInVertically { it / 3 },
                 exit = fadeOut(tween(120)),
             ) {
@@ -240,29 +241,29 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                     onCreateNextChapter = viewModel::createNextChapterAndInspect,
                     pendingCandidateCount = state.candidates.size,
                     onShowCandidates = viewModel::showCandidatePanel,
-                    onDeleteAllCandidates = { state.activeGroups.firstOrNull()?.let { viewModel.deleteAllCandidates(it.id) } },
+                    onDeleteAllCandidates = { activeGroup?.let { viewModel.deleteAllCandidates(it.id) } },
                     compact = true,
                 )
             }
             AnimatedVisibility(
-                visible = state.candidates.isNotEmpty() && candidatePanelExpanded,
+                visible = activeGroup != null && state.candidates.isNotEmpty() && candidatePanelExpanded,
                 enter = fadeIn(tween(180)) + slideInVertically { it / 3 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(150)) { it / 4 },
             ) {
-                if (state.candidates.isNotEmpty()) {
-                CandidatePanel(
-                    group = state.activeGroups.first(),
-                    candidates = state.candidates,
-                    onEdit = viewModel::editCandidate,
-                    onRoll = viewModel::roll,
-                    onDeleteCandidate = viewModel::deleteCandidate,
-                    onAccept = viewModel::acceptCandidate,
-                    onStop = viewModel::stopGeneration,
-                    onBackToPrompt = viewModel::hideCandidatePanel,
-                    streamReasoning = if (state.activeGroups.first().taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
-                    busy = busy,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
-                )
+                if (activeGroup != null && state.candidates.isNotEmpty()) {
+                    CandidatePanel(
+                        group = activeGroup,
+                        candidates = state.candidates,
+                        onEdit = viewModel::editCandidate,
+                        onRoll = viewModel::roll,
+                        onDeleteCandidate = viewModel::deleteCandidate,
+                        onAccept = viewModel::acceptCandidate,
+                        onStop = viewModel::stopGeneration,
+                        onBackToPrompt = viewModel::hideCandidatePanel,
+                        streamReasoning = if (activeGroup.taskType == TaskType.SUMMARY) summarySettings.streamThinking else bodySettings.streamThinking,
+                        busy = busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+                    )
                 }
             }
         }
@@ -767,6 +768,8 @@ private fun CandidatePanel(
     val pagerState = rememberPagerState(pageCount = { candidates.size })
     val scope = rememberCoroutineScope()
     var candidatePendingDelete by remember(group.id) { mutableStateOf<CandidateEntity?>(null) }
+    val currentPage = pagerState.currentPage.coerceIn(0, (candidates.size - 1).coerceAtLeast(0))
+    val displayPage = if (candidates.isEmpty()) 0 else currentPage + 1
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -787,25 +790,25 @@ private fun CandidatePanel(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        "候选 ${"%02d".format(pagerState.currentPage + 1)} · 还没有写入正文",
+                        "候选 ${"%02d".format(displayPage)} · 还没有写入正文",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 IconButton(
-                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                    enabled = pagerState.currentPage > 0,
+                    onClick = { scope.launch { pagerState.animateScrollToPage((currentPage - 1).coerceAtLeast(0)) } },
+                    enabled = currentPage > 0,
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "上一个候选")
                 }
                 Text(
-                    "${pagerState.currentPage + 1}/${candidates.size}",
+                    "$displayPage/${candidates.size}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 IconButton(
-                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                    enabled = pagerState.currentPage < candidates.lastIndex,
+                    onClick = { scope.launch { pagerState.animateScrollToPage((currentPage + 1).coerceAtMost(candidates.lastIndex.coerceAtLeast(0))) } },
+                    enabled = currentPage < candidates.lastIndex,
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "下一个候选")
                 }
@@ -817,14 +820,14 @@ private fun CandidatePanel(
                     }
                 }
                 IconButton(
-                    onClick = { candidates.getOrNull(pagerState.currentPage)?.let { candidatePendingDelete = it } },
+                    onClick = { candidates.getOrNull(currentPage)?.let { candidatePendingDelete = it } },
                 ) {
                     Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除当前候选")
                 }
             }
             HorizontalDivider()
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                val candidate = candidates[page]
+                val candidate = candidates.getOrNull(page) ?: return@HorizontalPager
                 var text by remember(candidate.id, candidate.editedText) { mutableStateOf(candidate.editedText) }
                 var reasoningExpanded by rememberSaveable(candidate.id) { mutableStateOf(false) }
                 Column(

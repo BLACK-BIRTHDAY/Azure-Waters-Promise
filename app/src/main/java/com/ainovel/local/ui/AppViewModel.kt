@@ -163,7 +163,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             selected,
             summaryList,
             groupList,
-            candidateList,
+            resolveActiveCandidates(groupList, candidateList),
             usage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WorkspaceUiState())
@@ -1033,5 +1033,13 @@ internal fun buildAssistantIdeaInfoMessage(
         else "已加入本作世界书，将陪伴下一次创作"
     }
     else -> "已存入本作，暂未启用"
+}
+
+internal fun resolveActiveCandidates(
+    activeGroups: List<CandidateGroupEntity>,
+    candidates: List<CandidateEntity>,
+): List<CandidateEntity> {
+    val activeGroupId = activeGroups.firstOrNull()?.id ?: return emptyList()
+    return candidates.filter { it.candidateGroupId == activeGroupId }
 }
 
