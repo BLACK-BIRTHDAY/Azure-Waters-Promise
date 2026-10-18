@@ -94,6 +94,7 @@ class NovelRepository(
 
     suspend fun novel(id: String) = novelDao.novel(id)
     suspend fun chapter(id: String) = novelDao.chapter(id)
+    suspend fun allChapters(novelId: String): List<ChapterEntity> = novelDao.allChapters(novelId)
     suspend fun candidateGroup(id: String) = generationDao.candidateGroup(id)
     suspend fun candidate(id: String) = generationDao.candidate(id)
     suspend fun requestSnapshot(id: String) = generationDao.requestSnapshot(id)

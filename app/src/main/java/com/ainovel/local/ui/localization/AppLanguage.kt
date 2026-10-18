@@ -526,6 +526,12 @@ private val exactEnglish = mapOf(
     "同时加入本作世界书" to "Also add to story world book",
     "世界书条目名称" to "World book entry name",
     "确认并前往写作" to "Confirm and start writing",
+    "导出 EPUB" to "Export EPUB",
+    "导出本作 EPUB" to "Export story as EPUB",
+    "EPUB 电子书已导出" to "EPUB ebook exported",
+    "导出 EPUB 失败" to "Could not export EPUB",
+    "还没有可导出的正文内容" to "No chapter text available to export yet",
+    "将当前作品的正文导出为标准 EPUB 电子书，方便在各类阅读器中阅读。" to "Export the current story as a standard EPUB ebook to read on e-readers.",
 )
 
 private fun translateDynamicText(source: String): String {
@@ -540,6 +546,9 @@ private fun translateDynamicText(source: String): String {
     }
     Regex("""^填入本章要求失败：(.*)$""").matchEntire(source)?.let {
         return "Could not apply chapter requirement: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
+    Regex("""^导出 EPUB 失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not export EPUB: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
     }
     Regex("""^已加载服务账号：(.+)（项目：(.+)）$""").matchEntire(source)?.let {
         return "Loaded service account: ${it.groupValues[1]} (project: ${it.groupValues[2]})"
@@ -663,6 +672,11 @@ private fun translateDynamicText(source: String): String {
         "调整顺序失败" to "Could not change the order",
         "保存灵感失败" to "Could not save idea",
         "填入本章要求失败" to "Could not apply chapter requirement",
+        "导出 EPUB 失败" to "Could not export EPUB",
+        "还没有可导出的正文内容" to "No chapter text available to export yet",
+        "导出 EPUB" to "Export EPUB",
+        "导出本作 EPUB" to "Export story as EPUB",
+        "EPUB 电子书已导出" to "EPUB ebook exported",
         "灵感记录 #" to "Idea record #",
         "下一章灵感 #" to "Next chapter idea #",
         "连接验证失败" to "Connection verification failed",

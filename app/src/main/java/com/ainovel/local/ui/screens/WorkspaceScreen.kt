@@ -1,5 +1,7 @@
 package com.ainovel.local.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -36,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CheckCircleOutline
@@ -98,6 +101,7 @@ import com.ainovel.local.data.model.CandidateGroupEntity
 import com.ainovel.local.data.model.ChapterEntity
 import com.ainovel.local.data.model.TaskType
 import com.ainovel.local.data.model.UsageRecordEntity
+import com.ainovel.local.domain.EpubExporter
 import com.ainovel.local.ui.AppViewModel
 import com.ainovel.local.ui.WorkspaceUiState
 import com.ainovel.local.ui.components.PrimaryAction
@@ -130,6 +134,15 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
     val hideDockForManuscriptKeyboard = manuscriptFocused && imeVisible
     val activeGroup = state.activeGroups.firstOrNull()
 
+    val exportEpubLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/epub+zip"),
+    ) { uri ->
+        if (uri != null) viewModel.exportNovelEpub(uri)
+    }
+    val onExportEpub = {
+        exportEpubLauncher.launch(EpubExporter.buildSuggestedFileName(state.novel?.name ?: "novel"))
+    }
+
     if (expanded) {
         Row(Modifier.fillMaxSize()) {
             AnimatedVisibility(
@@ -146,6 +159,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                         onMove = viewModel::moveChapter,
                         onDelete = viewModel::softDeleteChapter,
                         onRestore = viewModel::restoreChapter,
+                        onExportEpub = onExportEpub,
                         modifier = Modifier.width(232.dp).fillMaxHeight(),
                     )
                     VerticalDivider()
@@ -154,11 +168,12 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
             Column(Modifier.weight(1.5f).fillMaxHeight()) {
                 ManuscriptPane(
                     state = state,
-                        onContentChange = viewModel::updateChapterDraft,
+                    onContentChange = viewModel::updateChapterDraft,
                     onRename = viewModel::renameChapter,
                     onEditorFocusChange = { manuscriptFocused = it },
-                        onOpenChapters = { focusManager.clearFocus(); keyboardController?.hide(); chapterRailExpanded = !chapterRailExpanded },
+                    onOpenChapters = { focusManager.clearFocus(); keyboardController?.hide(); chapterRailExpanded = !chapterRailExpanded },
                     chaptersExpanded = chapterRailExpanded,
+                    onExportEpub = onExportEpub,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
                 if ((state.candidates.isEmpty() || !candidatePanelExpanded || activeGroup == null) && !hideDockForManuscriptKeyboard) {
@@ -220,6 +235,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                     onEditorFocusChange = { manuscriptFocused = it },
                     onOpenChapters = { focusManager.clearFocus(); keyboardController?.hide(); showChapters = true },
                     chaptersExpanded = showChapters,
+                    onExportEpub = onExportEpub,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -285,6 +301,10 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                 onMove = viewModel::moveChapter,
                 onDelete = viewModel::softDeleteChapter,
                 onRestore = viewModel::restoreChapter,
+                onExportEpub = {
+                    onExportEpub()
+                    showChapters = false
+                },
                 modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
             )
         }
@@ -300,6 +320,7 @@ private fun ChapterRail(
     onMove: (String, Int) -> Unit,
     onDelete: (String) -> Unit,
     onRestore: (String) -> Unit,
+    onExportEpub: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var deleteTarget by remember { mutableStateOf<ChapterEntity?>(null) }
@@ -309,6 +330,7 @@ private fun ChapterRail(
                 Text("章节", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("故事顺序", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            IconButton(onClick = onExportEpub) { Icon(Icons.Outlined.Book, contentDescription = "导出 EPUB") }
             IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = "创建下一章") }
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -392,6 +414,7 @@ private fun ManuscriptPane(
     onEditorFocusChange: (Boolean) -> Unit,
     onOpenChapters: (() -> Unit)?,
     chaptersExpanded: Boolean,
+    onExportEpub: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val chapter = state.selectedChapter
@@ -430,6 +453,9 @@ private fun ManuscriptPane(
             }
             state.latestUsage?.let { usage ->
                 ContextUsageRing(usage)
+            }
+            IconButton(onClick = onExportEpub) {
+                Icon(Icons.Outlined.Book, contentDescription = "导出 EPUB")
             }
             IconButton(onClick = { chapterDetailsExpanded = !chapterDetailsExpanded }) {
                 Icon(

@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Visibility
@@ -67,6 +68,7 @@ import com.ainovel.local.data.remote.ProviderDefinition
 import com.ainovel.local.data.remote.ReasoningStrength
 import com.ainovel.local.data.remote.ProviderModel
 import com.ainovel.local.data.remote.VertexAiServiceAccountAuth
+import com.ainovel.local.domain.EpubExporter
 import kotlinx.serialization.json.Json
 import com.ainovel.local.ui.AppViewModel
 import com.ainovel.local.ui.localization.AppLanguage
@@ -135,7 +137,7 @@ fun SettingsScreen(
             }
             item { InstructionSection(viewModel) }
         }
-        item { BackupSection(viewModel, rollbackAvailable, busy) }
+        item { BackupSection(viewModel, workspace.novel?.name, rollbackAvailable, busy) }
     }
 }
 
@@ -637,7 +639,12 @@ private fun InstructionSection(viewModel: AppViewModel) {
 }
 
 @Composable
-private fun BackupSection(viewModel: AppViewModel, rollbackAvailable: Boolean, busy: Boolean) {
+private fun BackupSection(
+    viewModel: AppViewModel,
+    novelName: String?,
+    rollbackAvailable: Boolean,
+    busy: Boolean,
+) {
     var createPassword by remember { mutableStateOf<String?>(null) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var restorePassword by remember { mutableStateOf<String?>(null) }
@@ -651,6 +658,11 @@ private fun BackupSection(viewModel: AppViewModel, rollbackAvailable: Boolean, b
         if (uri != null && password != null) viewModel.createBackup(uri, password.toCharArray())
         pendingCreatePassword = null
     }
+    val epubLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/epub+zip"),
+    ) { uri ->
+        if (uri != null) viewModel.exportNovelEpub(uri)
+    }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { restoreUri = uri; restorePassword = ""; preview = null }
     }
@@ -661,6 +673,21 @@ private fun BackupSection(viewModel: AppViewModel, rollbackAvailable: Boolean, b
                 primary = { modifier -> PrimaryAction("创建备份", onClick = { createPassword = "" }, modifier = modifier, enabled = !busy, icon = Icons.Outlined.Backup) },
                 secondary = { modifier -> SecondaryAction("选择备份恢复", onClick = { restoreLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) }, modifier = modifier, enabled = !busy, icon = Icons.Outlined.Restore) },
             )
+            if (novelName != null) {
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("导出本作 EPUB", style = MaterialTheme.typography.titleMedium)
+                        Text("将当前作品的正文导出为标准 EPUB 电子书，方便在各类阅读器中阅读。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    SecondaryAction(
+                        "导出本作 EPUB",
+                        onClick = { epubLauncher.launch(EpubExporter.buildSuggestedFileName(novelName)) },
+                        enabled = !busy,
+                        icon = Icons.Outlined.Book,
+                    )
+                }
+            }
             if (rollbackAvailable) {
                 HorizontalDivider()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
