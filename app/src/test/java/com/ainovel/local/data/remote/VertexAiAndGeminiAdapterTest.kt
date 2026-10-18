@@ -174,6 +174,12 @@ class VertexAiAndGeminiAdapterTest {
         assertFalse(VertexAiServiceAccountAuth.looksLikeServiceAccountJson(""))
         assertFalse(VertexAiServiceAccountAuth.looksLikeServiceAccountJson(null))
         assertFalse(VertexAiServiceAccountAuth.looksLikeServiceAccountJson("{ invalid json }"))
+
+        // UTF-8 BOM handling
+        val bomSaJson = "\uFEFF" + testSaJson
+        assertTrue(VertexAiServiceAccountAuth.looksLikeServiceAccountJson(bomSaJson))
+        val bomCreds = VertexAiServiceAccountAuth.parseServiceAccountJson(bomSaJson)
+        assertEquals("test-project-123", bomCreds.projectId)
     }
 
     @Test
@@ -1144,8 +1150,24 @@ class VertexAiAndGeminiAdapterTest {
             localized("服务账号凭证解析失败：invalid key", AppLanguage.ENGLISH)
         )
         assertEquals(
+            "Failed to parse or sign service account private key: bad key",
+            localized("服务账号私钥解析或签名失败：bad key", AppLanguage.ENGLISH)
+        )
+        assertEquals(
             "Failed to acquire Google OAuth2 access token: network error",
             localized("获取 Google OAuth2 访问令牌失败：network error", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Unable to connect to Google OAuth2 server: timeout",
+            localized("无法连接 Google OAuth2 服务：timeout", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Unable to connect to Google OAuth2 server: timeout",
+            localized("无法连接 Google OAuth2 服务器：timeout", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Google OAuth2 returned invalid JSON: eof",
+            localized("Google OAuth2 返回的不是合法的 JSON：eof", AppLanguage.ENGLISH)
         )
         assertEquals(
             "Google service account authentication failed (HTTP 401): invalid_grant",

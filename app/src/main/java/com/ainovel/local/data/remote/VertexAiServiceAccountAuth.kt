@@ -48,7 +48,7 @@ object VertexAiServiceAccountAuth {
 
     fun looksLikeServiceAccountJson(raw: String?): Boolean {
         if (raw.isNullOrBlank()) return false
-        val trimmed = raw.trim()
+        val trimmed = raw.trim().removePrefix("\uFEFF").trim()
         if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false
         return try {
             val element = defaultJson.parseToJsonElement(trimmed)
@@ -59,7 +59,7 @@ object VertexAiServiceAccountAuth {
     }
 
     fun parseServiceAccountJson(raw: String): ServiceAccountCredentials {
-        val trimmed = raw.trim()
+        val trimmed = raw.trim().removePrefix("\uFEFF").trim()
         val element = try {
             defaultJson.parseToJsonElement(trimmed)
         } catch (e: Exception) {

@@ -496,6 +496,7 @@ private val exactEnglish = mapOf(
     "服务账号 JSON 缺少 client_email" to "Service account JSON missing client_email",
     "服务账号 JSON 缺少有效的 private_key（需包含 PEM 格式私钥）" to "Service account JSON missing valid private_key (must contain PEM format private key)",
     "OAuth2 响应缺少 access_token" to "OAuth2 response missing access_token",
+    "Google OAuth2 返回缺失 access_token" to "Google OAuth2 response missing access_token",
 )
 
 private fun translateDynamicText(source: String): String {
@@ -508,11 +509,17 @@ private fun translateDynamicText(source: String): String {
     Regex("""^服务账号凭证解析失败：(.*)$""").matchEntire(source)?.let {
         return "Failed to parse service account credentials: ${it.groupValues[1]}"
     }
+    Regex("""^服务账号私钥解析或签名失败：(.*)$""").matchEntire(source)?.let {
+        return "Failed to parse or sign service account private key: ${it.groupValues[1]}"
+    }
     Regex("""^获取 Google OAuth2 访问令牌失败：(.*)$""").matchEntire(source)?.let {
         return "Failed to acquire Google OAuth2 access token: ${it.groupValues[1]}"
     }
-    Regex("""^无法连接 Google OAuth2 服务器：(.*)$""").matchEntire(source)?.let {
+    Regex("""^无法连接 Google OAuth2 服务(?:器)?：(.*)$""").matchEntire(source)?.let {
         return "Unable to connect to Google OAuth2 server: ${it.groupValues[1]}"
+    }
+    Regex("""^Google OAuth2 返回的不是合法的 JSON：(.*)$""").matchEntire(source)?.let {
+        return "Google OAuth2 returned invalid JSON: ${it.groupValues[1]}"
     }
     Regex("""^Google 服务账号认证失败（HTTP (\d+)）：(.*)$""").matchEntire(source)?.let {
         return "Google service account authentication failed (HTTP ${it.groupValues[1]}): ${it.groupValues[2]}"

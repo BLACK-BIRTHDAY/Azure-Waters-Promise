@@ -196,8 +196,9 @@ private fun ProviderSection(viewModel: AppViewModel, providers: List<ProviderCon
                 val rawJson = context.contentResolver.openInputStream(uri)?.use { stream ->
                     stream.bufferedReader(Charsets.UTF_8).readText()
                 } ?: throw IllegalStateException("无法读取选定文件")
-                val parsed = VertexAiServiceAccountAuth.parseServiceAccountJson(rawJson)
-                apiKey = rawJson.trim()
+                val cleanJson = rawJson.trim().removePrefix("\uFEFF").trim()
+                val parsed = VertexAiServiceAccountAuth.parseServiceAccountJson(cleanJson)
+                apiKey = cleanJson
                 val trimmedBaseUrl = baseUrl.trim()
                 val shouldUpdateBaseUrl = trimmedBaseUrl.isBlank() ||
                     trimmedBaseUrl == "https://generativelanguage.googleapis.com" ||
