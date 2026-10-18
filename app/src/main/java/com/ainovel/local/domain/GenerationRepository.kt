@@ -18,6 +18,7 @@ import com.ainovel.local.data.model.UsageRecordEntity
 import com.ainovel.local.data.model.AssistantSessionEntity
 import com.ainovel.local.data.remote.DeepSeekAdapter
 import com.ainovel.local.data.remote.AnthropicCompatibleAdapter
+import com.ainovel.local.data.remote.GeminiAdapter
 import com.ainovel.local.data.remote.GenerationSettings
 import com.ainovel.local.data.remote.LogicalContextItem
 import com.ainovel.local.data.remote.PreparedRequest
@@ -65,10 +66,10 @@ class GenerationRepository(
     private val contextAssembler: ContextAssembler,
     private val json: Json,
     private val adapters: Map<String, ProviderAdapter> = ProviderCatalog.definitions.associate { provider ->
-        provider.id to if (provider.id == "anthropic" || provider.id == "anthropic-compatible") {
-            AnthropicCompatibleAdapter(providerId = provider.id, providerDisplayName = provider.displayName)
-        } else {
-            DeepSeekAdapter(providerId = provider.id, providerDisplayName = provider.displayName)
+        provider.id to when (provider.id) {
+            "anthropic", "anthropic-compatible" -> AnthropicCompatibleAdapter(providerId = provider.id, providerDisplayName = provider.displayName)
+            "gemini", "vertex" -> GeminiAdapter(providerId = provider.id, providerDisplayName = provider.displayName)
+            else -> DeepSeekAdapter(providerId = provider.id, providerDisplayName = provider.displayName)
         }
     },
 ) {
@@ -230,13 +231,16 @@ class GenerationRepository(
 
     private fun manualModelCapabilities(providerId: String, modelId: String): ProviderModel {
         val lower = modelId.lowercase()
+        val isGeminiModel = providerId == "gemini" || providerId == "vertex" ||
+            lower.startsWith("gemini-2.5") || lower.startsWith("gemini-3") || lower.startsWith("gemini-4")
         val reasoning = lower.contains("reason") || lower.contains("thinking") ||
             (providerId == "deepseek" && (lower.startsWith("deepseek-v4") || lower == "deepseek-reasoner")) ||
-            (providerId == "openai" && (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5")))
+            (providerId == "openai" && (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5"))) ||
+            isGeminiModel
         return ProviderModel(
             id = modelId,
             supportsReasoning = reasoning,
-            supportsReasoningStrength = providerId == "deepseek" && lower.startsWith("deepseek-v4"),
+            supportsReasoningStrength = (providerId == "deepseek" && lower.startsWith("deepseek-v4")) || isGeminiModel,
         )
     }
 
