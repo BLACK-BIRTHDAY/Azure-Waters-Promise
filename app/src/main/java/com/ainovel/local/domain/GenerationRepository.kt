@@ -27,6 +27,7 @@ import com.ainovel.local.data.remote.ProviderException
 import com.ainovel.local.data.remote.ProviderMessage
 import com.ainovel.local.data.remote.ProviderModel
 import com.ainovel.local.data.remote.ProviderCatalog
+import com.ainovel.local.data.remote.VertexAiServiceAccountAuth
 import com.ainovel.local.data.remote.StreamEvent
 import com.ainovel.local.data.remote.StreamResult
 import com.ainovel.local.data.security.SecretStore
@@ -229,19 +230,29 @@ class GenerationRepository(
         return setting
     }
 
-    private fun manualModelCapabilities(providerId: String, modelId: String): ProviderModel {
-        val lower = modelId.lowercase()
-        val isGeminiModel = providerId == "gemini" || providerId == "vertex" ||
-            lower.startsWith("gemini-2.5") || lower.startsWith("gemini-3") || lower.startsWith("gemini-4")
-        val reasoning = lower.contains("reason") || lower.contains("thinking") ||
-            (providerId == "deepseek" && (lower.startsWith("deepseek-v4") || lower == "deepseek-reasoner")) ||
-            (providerId == "openai" && (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5"))) ||
-            isGeminiModel
-        return ProviderModel(
-            id = modelId,
-            supportsReasoning = reasoning,
-            supportsReasoningStrength = (providerId == "deepseek" && lower.startsWith("deepseek-v4")) || isGeminiModel,
-        )
+    companion object {
+        fun manualModelCapabilities(providerId: String, modelId: String): ProviderModel {
+            val cleanModel = VertexAiServiceAccountAuth.normalizeVertexModelId(modelId)
+            val lower = cleanModel.lowercase()
+            val isImageModel = lower.contains("imagen") || lower.contains("image")
+            val isReasoningGemini = !isImageModel && (
+                lower.startsWith("gemini-2.5") ||
+                lower.startsWith("gemini-3") ||
+                lower.startsWith("gemini-4") ||
+                Regex("""^gemini-(?:[3-9]|\d{2,})(?:[.-].*|$)""").matches(lower) ||
+                lower.contains("thinking")
+            )
+            val reasoning = (!isImageModel && (lower.contains("reason") || lower.contains("thinking"))) ||
+                (providerId == "deepseek" && (lower.startsWith("deepseek-v4") || lower == "deepseek-reasoner")) ||
+                (providerId == "openai" && (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5"))) ||
+                isReasoningGemini
+            val reasoningStrength = (providerId == "deepseek" && lower.startsWith("deepseek-v4")) || isReasoningGemini
+            return ProviderModel(
+                id = modelId,
+                supportsReasoning = reasoning,
+                supportsReasoningStrength = reasoningStrength,
+            )
+        }
     }
 
     suspend fun generateBody(

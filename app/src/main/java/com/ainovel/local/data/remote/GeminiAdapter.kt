@@ -60,6 +60,9 @@ class GeminiAdapter(
             val accessToken = try {
                 VertexAiServiceAccountAuth.getAccessToken(credentials, client)
             } catch (e: ProviderException) {
+                if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+                    throw ProviderException(statusCode = 401, retryable = false, message = e.message.orEmpty(), cause = e)
+                }
                 throw e
             } catch (e: Exception) {
                 throw ProviderException(
@@ -118,26 +121,7 @@ class GeminiAdapter(
             return@withContext collectedModels
         }
 
-        return@withContext listOf(
-            ProviderModel(
-                id = "gemini-2.5-pro",
-                displayName = "Gemini 2.5 Pro",
-                supportsReasoning = true,
-                supportsReasoningStrength = true,
-            ),
-            ProviderModel(
-                id = "gemini-2.5-flash",
-                displayName = "Gemini 2.5 Flash",
-                supportsReasoning = true,
-                supportsReasoningStrength = true,
-            ),
-            ProviderModel(
-                id = "gemini-3.8-flash-tiered",
-                displayName = "Gemini 3.8 Flash (Tiered)",
-                supportsReasoning = true,
-                supportsReasoningStrength = true,
-            ),
-        )
+        return@withContext DEFAULT_VERTEX_MODELS
     } else {
         var cleanBase = baseUrl.trim().trimEnd('/')
         for (p in listOf("/v1beta/openai", "/openai", "/v1beta", "/v1")) {
@@ -274,6 +258,7 @@ class GeminiAdapter(
         val isModernGemini = cleanModel.startsWith("gemini-3") ||
             cleanModel.startsWith("gemini-4") ||
             modernGeminiRegex.matches(cleanModel)
+        val isReasoningModel = isModernGemini || cleanModel.startsWith("gemini-2.5") || cleanModel.contains("thinking")
 
         val body = buildJsonObject {
             put("contents", buildJsonArray {
@@ -307,42 +292,44 @@ class GeminiAdapter(
 
             put("generationConfig", buildJsonObject {
                 settings.maxOutputTokens?.let { put("maxOutputTokens", it) }
-                if (!settings.thinkingEnabled) {
+                if (!settings.thinkingEnabled || !isReasoningModel) {
                     settings.temperature?.let { put("temperature", it) }
                 }
-                put("thinkingConfig", buildJsonObject {
-                    if (isModernGemini) {
-                        if (!settings.thinkingEnabled) {
-                            put("includeThoughts", false)
-                        } else {
-                            put("includeThoughts", true)
-                            val level = when (settings.reasoningStrength) {
-                                ReasoningStrength.WEAK -> "LOW"
-                                ReasoningStrength.MEDIUM -> "MEDIUM"
-                                ReasoningStrength.STRONG -> "HIGH"
-                                ReasoningStrength.UNSUPPORTED -> null
-                            }
-                            if (level != null) {
-                                put("thinkingLevel", level)
-                            }
-                        }
-                    } else {
-                        if (!settings.thinkingEnabled) {
-                            put("includeThoughts", false)
-                            if (!cleanModel.contains("gemini-2.5-pro")) {
-                                put("thinkingBudget", 0)
+                if (isReasoningModel) {
+                    put("thinkingConfig", buildJsonObject {
+                        if (isModernGemini) {
+                            if (!settings.thinkingEnabled) {
+                                put("includeThoughts", false)
+                            } else {
+                                put("includeThoughts", true)
+                                val level = when (settings.reasoningStrength) {
+                                    ReasoningStrength.WEAK -> "LOW"
+                                    ReasoningStrength.MEDIUM -> "MEDIUM"
+                                    ReasoningStrength.STRONG -> "HIGH"
+                                    ReasoningStrength.UNSUPPORTED -> null
+                                }
+                                if (level != null) {
+                                    put("thinkingLevel", level)
+                                }
                             }
                         } else {
-                            put("includeThoughts", true)
-                            val budget = when (settings.reasoningStrength) {
-                                ReasoningStrength.WEAK -> 1024
-                                ReasoningStrength.STRONG -> 16384
-                                ReasoningStrength.MEDIUM, ReasoningStrength.UNSUPPORTED -> 4096
+                            if (!settings.thinkingEnabled) {
+                                put("includeThoughts", false)
+                                if (!cleanModel.contains("gemini-2.5-pro")) {
+                                    put("thinkingBudget", 0)
+                                }
+                            } else {
+                                put("includeThoughts", true)
+                                val budget = when (settings.reasoningStrength) {
+                                    ReasoningStrength.WEAK -> 1024
+                                    ReasoningStrength.STRONG -> 16384
+                                    ReasoningStrength.MEDIUM, ReasoningStrength.UNSUPPORTED -> 4096
+                                }
+                                put("thinkingBudget", budget)
                             }
-                            put("thinkingBudget", budget)
                         }
-                    }
-                })
+                    })
+                }
             })
         }
 
@@ -393,7 +380,27 @@ class GeminiAdapter(
             .post(preparedRequest.serializedRequestBody.toRequestBody(JSON_MEDIA_TYPE))
 
         if (saCredentials != null) {
-            val accessToken = VertexAiServiceAccountAuth.getAccessToken(saCredentials, client)
+            val accessToken = try {
+                VertexAiServiceAccountAuth.getAccessToken(saCredentials, client)
+            } catch (e: ProviderException) {
+                if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+                    throw ProviderException(
+                        statusCode = 401,
+                        retryable = false,
+                        responseBody = e.responseBody,
+                        message = e.message.orEmpty(),
+                        cause = e,
+                    )
+                }
+                throw e
+            } catch (e: Exception) {
+                throw ProviderException(
+                    statusCode = 401,
+                    retryable = false,
+                    message = "获取 Google OAuth2 访问令牌失败：${e.message}",
+                    cause = e,
+                )
+            }
             reqBuilder.header("Authorization", "Bearer $accessToken")
             reqBuilder.header("x-goog-user-project", saCredentials.projectId)
         } else {
@@ -633,8 +640,42 @@ class GeminiAdapter(
         )
     }
 
-    private companion object {
-        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+    companion object {
+        val DEFAULT_VERTEX_MODELS = listOf(
+            ProviderModel(
+                id = "gemini-2.5-pro",
+                displayName = "Gemini 2.5 Pro",
+                supportsTextGeneration = true,
+                supportsStreaming = true,
+                supportsReasoning = true,
+                supportsReasoningStrength = true,
+            ),
+            ProviderModel(
+                id = "gemini-2.5-flash",
+                displayName = "Gemini 2.5 Flash",
+                supportsTextGeneration = true,
+                supportsStreaming = true,
+                supportsReasoning = true,
+                supportsReasoningStrength = true,
+            ),
+            ProviderModel(
+                id = "gemini-3.8-flash-tiered",
+                displayName = "Gemini 3.8 Flash (Tiered)",
+                supportsTextGeneration = true,
+                supportsStreaming = true,
+                supportsReasoning = true,
+                supportsReasoningStrength = true,
+            ),
+            ProviderModel(
+                id = "gemini-4-argon",
+                displayName = "Gemini 4 Argon",
+                supportsTextGeneration = true,
+                supportsStreaming = true,
+                supportsReasoning = true,
+                supportsReasoningStrength = true,
+            ),
+        )
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
 

@@ -178,12 +178,8 @@ object VertexAiServiceAccountAuth {
             val projectId = resolveProjectId(trimmed, credentials.projectId)
             val version = if (trimmed.contains("/v1beta1")) "v1beta1" else "v1"
 
-            if (trimmed.isBlank() || trimmed == "https://" || trimmed == "http://") {
-                val host = vertexHostForLocation(location)
-                return "https://$host/v1/projects/$projectId/locations/$location/publishers/google/models/$cleanModel$action"
-            }
-
-            if (trimmed.contains("aiplatform.googleapis.com") || trimmed.contains("aiplatform.eu.rep.googleapis.com")) {
+            val isGoogleHost = trimmed.contains("googleapis.com", ignoreCase = true)
+            if (isGoogleHost || trimmed.isBlank() || trimmed == "https://" || trimmed == "http://") {
                 val host = vertexHostForLocation(location)
                 return "https://$host/$version/projects/$projectId/locations/$location/publishers/google/models/$cleanModel$action"
             }
@@ -284,7 +280,16 @@ object VertexAiServiceAccountAuth {
             return cached.token
         }
 
-        val jwt = createSignedJwt(credentials, nowEpochSeconds = nowMillis / 1000L)
+        val jwt = try {
+            createSignedJwt(credentials, nowEpochSeconds = nowMillis / 1000L)
+        } catch (e: Exception) {
+            throw ProviderException(
+                statusCode = 401,
+                retryable = false,
+                message = "服务账号私钥解析或签名失败：${e.message}",
+                cause = e,
+            )
+        }
         val formBody = FormBody.Builder()
             .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
             .add("assertion", jwt)
@@ -311,9 +316,10 @@ object VertexAiServiceAccountAuth {
             val rawBody = resp.body.string()
             if (!resp.isSuccessful) {
                 val safe = sanitizeBody(rawBody, credentials)
+                val isAuthFailure = resp.code == 400 || resp.code == 401 || resp.code == 403
                 throw ProviderException(
-                    statusCode = resp.code,
-                    retryable = resp.code == 408 || resp.code == 429 || resp.code >= 500,
+                    statusCode = if (isAuthFailure) 401 else resp.code,
+                    retryable = if (isAuthFailure) false else (resp.code == 408 || resp.code == 429 || resp.code >= 500),
                     responseBody = safe.take(4_000),
                     message = "Google 服务账号认证失败（HTTP ${resp.code}）：$safe",
                 )

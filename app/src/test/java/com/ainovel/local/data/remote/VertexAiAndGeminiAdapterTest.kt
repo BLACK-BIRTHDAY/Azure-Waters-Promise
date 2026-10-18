@@ -1,6 +1,7 @@
 package com.ainovel.local.data.remote
 
 import com.ainovel.local.data.model.TaskType
+import com.ainovel.local.domain.GenerationRepository
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.security.KeyPair
@@ -796,10 +797,11 @@ class VertexAiAndGeminiAdapterTest {
             """.trimIndent()
             val adapter = GeminiAdapter()
             val models = adapter.listModels("http://127.0.0.1:$port", saJson)
-            assertEquals(3, models.size)
+            assertEquals(4, models.size)
             assertEquals("gemini-2.5-pro", models[0].id)
             assertEquals("gemini-2.5-flash", models[1].id)
             assertEquals("gemini-3.8-flash-tiered", models[2].id)
+            assertEquals("gemini-4-argon", models[3].id)
         } finally {
             server.stop(0)
         }
@@ -902,5 +904,197 @@ class VertexAiAndGeminiAdapterTest {
         assertEquals("Google Cloud Vertex AI", vertexDef?.displayName)
         assertEquals("https://aiplatform.googleapis.com", vertexDef?.defaultBaseUrl)
         assertEquals("Vertex AI 原生", vertexDef?.protocolLabel)
+
+        // Test manualModelCapabilities
+        val flash15 = GenerationRepository.manualModelCapabilities("gemini", "gemini-1.5-flash")
+        assertFalse(flash15.supportsReasoning)
+        assertFalse(flash15.supportsReasoningStrength)
+
+        val pro15 = GenerationRepository.manualModelCapabilities("gemini", "gemini-1.5-pro")
+        assertFalse(pro15.supportsReasoning)
+        assertFalse(pro15.supportsReasoningStrength)
+
+        val flash25 = GenerationRepository.manualModelCapabilities("gemini", "gemini-2.5-flash")
+        assertTrue(flash25.supportsReasoning)
+        assertTrue(flash25.supportsReasoningStrength)
+
+        val tiered38 = GenerationRepository.manualModelCapabilities("vertex", "publishers/google/models/gemini-3.8-flash-tiered")
+        assertTrue(tiered38.supportsReasoning)
+        assertTrue(tiered38.supportsReasoningStrength)
+
+        val argon4 = GenerationRepository.manualModelCapabilities("vertex", "gemini-4-argon")
+        assertTrue(argon4.supportsReasoning)
+        assertTrue(argon4.supportsReasoningStrength)
+
+        val imagen = GenerationRepository.manualModelCapabilities("gemini", "imagen-3.0-generate-002")
+        assertFalse(imagen.supportsReasoning)
+        assertFalse(imagen.supportsReasoningStrength)
+    }
+
+    @Test
+    fun testGenerativeLanguageUrlWithServiceAccountRoutesToVertexAi() {
+        val creds = VertexAiServiceAccountAuth.ServiceAccountCredentials(
+            projectId = "my-test-proj",
+            clientEmail = "sa@my-test-proj.iam.gserviceaccount.com",
+            privateKeyPem = testPrivateKeyPem,
+            defaultLocation = "global",
+        )
+        val url = VertexAiServiceAccountAuth.buildGenerateContentUrl(
+            baseUrl = "https://generativelanguage.googleapis.com",
+            model = "gemini-2.5-flash",
+            stream = false,
+            credentials = creds,
+        )
+        assertEquals(
+            "https://aiplatform.googleapis.com/v1/projects/my-test-proj/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+            url,
+        )
+
+        val streamUrl = VertexAiServiceAccountAuth.buildGenerateContentUrl(
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta",
+            model = "publishers/google/models/gemini-2.5-flash",
+            stream = true,
+            credentials = creds,
+        )
+        assertEquals(
+            "https://aiplatform.googleapis.com/v1/projects/my-test-proj/locations/global/publishers/google/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+            streamUrl,
+        )
+    }
+
+    @Test
+    fun testOAuth2TokenEndpointHttp400ThrowsProviderException401(): Unit = runBlocking {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val port = server.address.port
+
+        server.createContext("/token") { exchange ->
+            val errorJson = """{"error": "invalid_grant", "error_description": "Invalid JWT Signature."}"""
+            val bytes = errorJson.toByteArray(Charsets.UTF_8)
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(400, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+
+        val okHttpClient = OkHttpClient()
+        val credentials = VertexAiServiceAccountAuth.ServiceAccountCredentials(
+            projectId = "test-project-123",
+            clientEmail = "sa-test@test.iam.gserviceaccount.com",
+            privateKeyPem = testPrivateKeyPem,
+            tokenUri = "http://127.0.0.1:$port/token",
+        )
+
+        try {
+            // Direct call to getAccessToken
+            try {
+                VertexAiServiceAccountAuth.getAccessToken(credentials, okHttpClient)
+                fail("Expected ProviderException on HTTP 400 from token endpoint")
+            } catch (e: ProviderException) {
+                assertEquals(401, e.statusCode)
+                assertFalse(e.retryable)
+                assertTrue(e.message.orEmpty().contains("Google 服务账号认证失败（HTTP 400）"))
+                assertTrue(e.message.orEmpty().contains("invalid_grant"))
+            }
+
+            // Call via GeminiAdapter.listModels
+            val saJson = """
+                {
+                  "type": "service_account",
+                  "project_id": "test-project-123",
+                  "private_key": "${testPrivateKeyPem.replace("\n", "\\n")}",
+                  "client_email": "sa-test@test.iam.gserviceaccount.com",
+                  "token_uri": "http://127.0.0.1:$port/token"
+                }
+            """.trimIndent()
+            val adapter = GeminiAdapter()
+            try {
+                adapter.listModels("http://127.0.0.1:$port", saJson)
+                fail("Expected ProviderException on listModels when token endpoint returns 400")
+            } catch (e: ProviderException) {
+                assertEquals(401, e.statusCode)
+                assertFalse(e.retryable)
+            }
+
+            // Call via GeminiAdapter.stream
+            val prepared = adapter.prepare(
+                taskType = TaskType.MODEL_VALIDATION,
+                novelId = null,
+                targetEntityId = null,
+                modelId = "gemini-2.5-flash",
+                logicalContext = emptyList(),
+                messages = listOf(ProviderMessage(role = "user", content = "test")),
+                settings = GenerationSettings(streamOutput = false),
+            )
+            try {
+                adapter.stream("http://127.0.0.1:$port", saJson, prepared).toList()
+                fail("Expected ProviderException on stream when token endpoint returns 400")
+            } catch (e: ProviderException) {
+                assertEquals(401, e.statusCode)
+                assertFalse(e.retryable)
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun testGemini15FlashDoesNotIncludeThinkingConfigInPrepare() {
+        val adapter = GeminiAdapter()
+        val messages = listOf(ProviderMessage(role = "user", content = "Hello"))
+
+        // gemini-1.5-flash with thinkingEnabled = false
+        val preparedDisabled = adapter.prepare(
+            taskType = TaskType.BODY,
+            novelId = "n1",
+            targetEntityId = "c1",
+            modelId = "gemini-1.5-flash",
+            logicalContext = emptyList(),
+            messages = messages,
+            settings = GenerationSettings(
+                thinkingEnabled = false,
+                temperature = 0.7,
+                maxOutputTokens = 2048,
+            ),
+        )
+        val jsonDisabled = json.parseToJsonElement(preparedDisabled.serializedRequestBody).jsonObject
+        val genConfigDisabled = jsonDisabled["generationConfig"]?.jsonObject
+        assertNotNull(genConfigDisabled)
+        assertNull(genConfigDisabled?.get("thinkingConfig"))
+        assertEquals(0.7, genConfigDisabled?.get("temperature")?.jsonPrimitive?.content?.toDouble() ?: 0.0, 0.001)
+        assertEquals(2048, genConfigDisabled?.get("maxOutputTokens")?.jsonPrimitive?.intOrNull)
+
+        // gemini-1.5-flash even with thinkingEnabled = true must NOT include thinkingConfig
+        val preparedEnabled = adapter.prepare(
+            taskType = TaskType.BODY,
+            novelId = "n1",
+            targetEntityId = "c1",
+            modelId = "gemini-1.5-flash",
+            logicalContext = emptyList(),
+            messages = messages,
+            settings = GenerationSettings(
+                thinkingEnabled = true,
+                temperature = 0.8,
+            ),
+        )
+        val jsonEnabled = json.parseToJsonElement(preparedEnabled.serializedRequestBody).jsonObject
+        val genConfigEnabled = jsonEnabled["generationConfig"]?.jsonObject
+        assertNotNull(genConfigEnabled)
+        assertNull(genConfigEnabled?.get("thinkingConfig"))
+        assertEquals(0.8, genConfigEnabled?.get("temperature")?.jsonPrimitive?.content?.toDouble() ?: 0.0, 0.001)
+
+        // gemini-1.5-pro must also NOT include thinkingConfig
+        val proPrepared = adapter.prepare(
+            taskType = TaskType.BODY,
+            novelId = "n1",
+            targetEntityId = "c1",
+            modelId = "gemini-1.5-pro",
+            logicalContext = emptyList(),
+            messages = messages,
+            settings = GenerationSettings(
+                thinkingEnabled = false,
+            ),
+        )
+        val proJson = json.parseToJsonElement(proPrepared.serializedRequestBody).jsonObject
+        assertNull(proJson["generationConfig"]?.jsonObject?.get("thinkingConfig"))
     }
 }
