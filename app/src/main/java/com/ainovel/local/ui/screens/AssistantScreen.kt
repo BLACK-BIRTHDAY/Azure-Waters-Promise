@@ -64,7 +64,9 @@ import com.ainovel.local.data.remote.ProviderMessage
 import com.ainovel.local.ui.AppViewModel
 import com.ainovel.local.ui.components.PrimaryAction
 import com.ainovel.local.ui.components.SecondaryAction
+import com.ainovel.local.ui.localization.LocalAppLanguage
 import com.ainovel.local.ui.localization.Text
+import com.ainovel.local.ui.localization.localized
 
 @Composable
 fun AssistantScreen(viewModel: AppViewModel) {
@@ -127,7 +129,7 @@ fun AssistantScreen(viewModel: AppViewModel) {
                     TranscriptEntry(
                         index = index,
                         message = message,
-                        viewModel = viewModel,
+                        onNotifyCopied = { viewModel.notifyCopiedToClipboard() },
                         onSaveIdea = { idx, content -> saveIdeaTarget = idx to content },
                         onApplyRequirement = { idx, content -> applyRequirementTarget = idx to content },
                     )
@@ -275,7 +277,7 @@ private fun LiveAssistantEntry(content: String, reasoning: String) {
 private fun TranscriptEntry(
     index: Int,
     message: ProviderMessage,
-    viewModel: AppViewModel,
+    onNotifyCopied: () -> Unit,
     onSaveIdea: (Int, String) -> Unit,
     onApplyRequirement: (Int, String) -> Unit,
 ) {
@@ -364,8 +366,9 @@ private fun TranscriptEntry(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("绀海之约灵感", message.content))
-                    viewModel.notifyCopiedToClipboard()
+                    onNotifyCopied()
                 },
+                enabled = message.content.isNotBlank(),
                 label = { Text("复制") },
                 leadingIcon = {
                     Icon(
@@ -412,7 +415,10 @@ private fun SaveAssistantIdeaDialog(
     onDismiss: () -> Unit,
     onConfirm: (name: String, content: String, scope: EntryScope, type: EntryType, enabledForNovel: Boolean) -> Unit,
 ) {
-    var name by rememberSaveable(index) { mutableStateOf("灵感记录 #${"%02d".format(index + 1)}") }
+    val currentLanguage = LocalAppLanguage.current
+    var name by rememberSaveable(index) {
+        mutableStateOf(localized("灵感记录 #${"%02d".format(index + 1)}", currentLanguage))
+    }
     var content by rememberSaveable(index) { mutableStateOf(initialContent) }
     var scope by rememberSaveable(index) { mutableStateOf(if (hasSelectedNovel) EntryScope.NOVEL else EntryScope.GLOBAL) }
     var type by rememberSaveable(index) { mutableStateOf(EntryType.WORLDBOOK) }
@@ -535,9 +541,12 @@ private fun UseAsRequirementDialog(
     onDismiss: () -> Unit,
     onConfirm: (requirementText: String, alsoAddToNovelWorldbook: Boolean, worldbookName: String) -> Unit,
 ) {
+    val currentLanguage = LocalAppLanguage.current
     var content by rememberSaveable(index) { mutableStateOf(initialContent) }
     var alsoAddToWorldbook by rememberSaveable(index) { mutableStateOf(false) }
-    var worldbookName by rememberSaveable(index) { mutableStateOf("下一章灵感 #${"%02d".format(index + 1)}") }
+    var worldbookName by rememberSaveable(index) {
+        mutableStateOf(localized("下一章灵感 #${"%02d".format(index + 1)}", currentLanguage))
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,

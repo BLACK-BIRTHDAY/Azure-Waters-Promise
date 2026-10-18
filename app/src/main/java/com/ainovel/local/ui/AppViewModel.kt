@@ -845,32 +845,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         type: EntryType = EntryType.WORLDBOOK,
         enabledForNovel: Boolean = true,
     ) = launchAction("保存灵感失败") {
-        require(name.trim().isNotEmpty()) { "请输入给自己看的名字" }
-        require(content.trim().isNotEmpty()) { "请输入灵感内容" }
-        val novelId = if (scope == EntryScope.NOVEL) {
-            requireNotNull(selectedNovelId.value) { "请先选择作品" }
-        } else {
-            null
-        }
-        val entry = ContextEntryEntity(
-            type = type,
+        val entry = buildAssistantIdeaEntry(
+            name = name,
+            content = content,
             scope = scope,
-            novelId = novelId,
-            name = name.trim(),
-            content = content.trim(),
-            enabled = if (scope == EntryScope.NOVEL) enabledForNovel else false,
-            sortOrder = System.currentTimeMillis(),
+            type = type,
+            novelId = selectedNovelId.value,
+            enabledForNovel = enabledForNovel,
         )
         novelRepository.upsertContextEntry(entry)
-        val infoMessage = when {
-            scope == EntryScope.GLOBAL -> "已收入灵感素材库，可在“记忆 · 灵感素材”中查看"
-            scope == EntryScope.NOVEL && enabledForNovel -> {
-                if (type == EntryType.PRESET) "已加入本作预设，将陪伴下一次创作"
-                else "已加入本作世界书，将陪伴下一次创作"
-            }
-            else -> "已存入本作，暂未启用"
-        }
-        _messages.emit(UiMessage.Info(infoMessage))
+        _messages.emit(UiMessage.Info(buildAssistantIdeaInfoMessage(scope, type, enabledForNovel)))
     }
 
     fun applyAssistantIdeaAsRequirement(
@@ -1011,3 +995,43 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         const val DELETE_CANDIDATE_CANCELLATION = "delete-candidate"
     }
 }
+
+internal fun buildAssistantIdeaEntry(
+    name: String,
+    content: String,
+    scope: EntryScope,
+    type: EntryType = EntryType.WORLDBOOK,
+    novelId: String? = null,
+    enabledForNovel: Boolean = true,
+): ContextEntryEntity {
+    require(name.trim().isNotEmpty()) { "请输入给自己看的名字" }
+    require(content.trim().isNotEmpty()) { "请输入灵感内容" }
+    val resolvedNovelId = if (scope == EntryScope.NOVEL) {
+        requireNotNull(novelId) { "请先选择作品" }
+    } else {
+        null
+    }
+    return ContextEntryEntity(
+        type = type,
+        scope = scope,
+        novelId = resolvedNovelId,
+        name = name.trim(),
+        content = content.trim(),
+        enabled = if (scope == EntryScope.NOVEL) enabledForNovel else false,
+        sortOrder = System.currentTimeMillis(),
+    )
+}
+
+internal fun buildAssistantIdeaInfoMessage(
+    scope: EntryScope,
+    type: EntryType = EntryType.WORLDBOOK,
+    enabledForNovel: Boolean = true,
+): String = when {
+    scope == EntryScope.GLOBAL -> "已收入灵感素材库，可在“记忆 · 灵感素材”中查看"
+    scope == EntryScope.NOVEL && enabledForNovel -> {
+        if (type == EntryType.PRESET) "已加入本作预设，将陪伴下一次创作"
+        else "已加入本作世界书，将陪伴下一次创作"
+    }
+    else -> "已存入本作，暂未启用"
+}
+

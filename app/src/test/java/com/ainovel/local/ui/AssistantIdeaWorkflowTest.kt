@@ -17,41 +17,6 @@ class AssistantIdeaWorkflowTest {
 
     // --- Helper logic matching AppViewModel operations ---
 
-    private fun buildAssistantIdeaEntry(
-        name: String,
-        content: String,
-        scope: EntryScope,
-        type: EntryType = EntryType.WORLDBOOK,
-        enabledForNovel: Boolean = true,
-        selectedNovelId: String? = null,
-    ): Pair<ContextEntryEntity, String> {
-        require(name.trim().isNotEmpty()) { "请输入给自己看的名字" }
-        require(content.trim().isNotEmpty()) { "请输入灵感内容" }
-        val novelId = if (scope == EntryScope.NOVEL) {
-            requireNotNull(selectedNovelId) { "请先选择作品" }
-        } else {
-            null
-        }
-        val entry = ContextEntryEntity(
-            type = type,
-            scope = scope,
-            novelId = novelId,
-            name = name.trim(),
-            content = content.trim(),
-            enabled = if (scope == EntryScope.NOVEL) enabledForNovel else false,
-            sortOrder = System.currentTimeMillis(),
-        )
-        val infoMessage = when {
-            scope == EntryScope.GLOBAL -> "已收入灵感素材库，可在“记忆 · 灵感素材”中查看"
-            scope == EntryScope.NOVEL && enabledForNovel -> {
-                if (type == EntryType.PRESET) "已加入本作预设，将陪伴下一次创作"
-                else "已加入本作世界书，将陪伴下一次创作"
-            }
-            else -> "已存入本作，暂未启用"
-        }
-        return entry to infoMessage
-    }
-
     private fun buildRequirementApplication(
         requirementText: String,
         alsoAddToNovelWorldbook: Boolean = false,
@@ -86,13 +51,18 @@ class AssistantIdeaWorkflowTest {
 
     @Test
     fun testSaveAssistantIdeaToGlobalForcesDisabledAndNullNovelId() {
-        val (entry, msg) = buildAssistantIdeaEntry(
+        val entry = buildAssistantIdeaEntry(
             name = "  海风中的低语  ",
             content = "  主角在港口听到了古老的誓约…  ",
             scope = EntryScope.GLOBAL,
             type = EntryType.WORLDBOOK,
+            novelId = "novel-123",
             enabledForNovel = true,
-            selectedNovelId = "novel-123",
+        )
+        val msg = buildAssistantIdeaInfoMessage(
+            scope = EntryScope.GLOBAL,
+            type = EntryType.WORLDBOOK,
+            enabledForNovel = true,
         )
         assertEquals("海风中的低语", entry.name)
         assertEquals("主角在港口听到了古老的誓约…", entry.content)
@@ -105,13 +75,18 @@ class AssistantIdeaWorkflowTest {
 
     @Test
     fun testSaveAssistantIdeaToNovelEnabledWorldbook() {
-        val (entry, msg) = buildAssistantIdeaEntry(
+        val entry = buildAssistantIdeaEntry(
             name = "深海神殿",
             content = "神殿位于海底三千米处。",
             scope = EntryScope.NOVEL,
             type = EntryType.WORLDBOOK,
+            novelId = "novel-123",
             enabledForNovel = true,
-            selectedNovelId = "novel-123",
+        )
+        val msg = buildAssistantIdeaInfoMessage(
+            scope = EntryScope.NOVEL,
+            type = EntryType.WORLDBOOK,
+            enabledForNovel = true,
         )
         assertEquals("深海神殿", entry.name)
         assertEquals("神殿位于海底三千米处。", entry.content)
@@ -124,13 +99,18 @@ class AssistantIdeaWorkflowTest {
 
     @Test
     fun testSaveAssistantIdeaToNovelEnabledPreset() {
-        val (entry, msg) = buildAssistantIdeaEntry(
+        val entry = buildAssistantIdeaEntry(
             name = "叙事口吻预设",
             content = "用克制且充满诗意的文字叙述。",
             scope = EntryScope.NOVEL,
             type = EntryType.PRESET,
+            novelId = "novel-123",
             enabledForNovel = true,
-            selectedNovelId = "novel-123",
+        )
+        val msg = buildAssistantIdeaInfoMessage(
+            scope = EntryScope.NOVEL,
+            type = EntryType.PRESET,
+            enabledForNovel = true,
         )
         assertEquals("叙事口吻预设", entry.name)
         assertEquals(EntryScope.NOVEL, entry.scope)
@@ -142,13 +122,18 @@ class AssistantIdeaWorkflowTest {
 
     @Test
     fun testSaveAssistantIdeaToNovelDisabled() {
-        val (entry, msg) = buildAssistantIdeaEntry(
+        val entry = buildAssistantIdeaEntry(
             name = "暂存伏笔",
             content = "可能在第三卷才用到的设定。",
             scope = EntryScope.NOVEL,
             type = EntryType.WORLDBOOK,
+            novelId = "novel-123",
             enabledForNovel = false,
-            selectedNovelId = "novel-123",
+        )
+        val msg = buildAssistantIdeaInfoMessage(
+            scope = EntryScope.NOVEL,
+            type = EntryType.WORLDBOOK,
+            enabledForNovel = false,
         )
         assertEquals(EntryScope.NOVEL, entry.scope)
         assertEquals("novel-123", entry.novelId)
@@ -185,7 +170,7 @@ class AssistantIdeaWorkflowTest {
                 name = "有名字",
                 content = "有内容",
                 scope = EntryScope.NOVEL,
-                selectedNovelId = null,
+                novelId = null,
             )
             fail("Expected exception for null novelId on NOVEL scope")
         } catch (e: IllegalArgumentException) {
