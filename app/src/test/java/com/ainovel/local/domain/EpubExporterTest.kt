@@ -123,14 +123,17 @@ class EpubExporterTest {
         assertTrue(containerXml.contains("full-path=\"OEBPS/content.opf\""))
         assertTrue(containerXml.contains("media-type=\"application/oebps-package+xml\""))
 
-        // 6. Verify XML escaping in content.opf
+        // 6. Verify XML escaping and structure in content.opf
         val opf = entries["OEBPS/content.opf"]!!.toString(Charsets.UTF_8)
         assertTrue("OPF must escape &", opf.contains("绀海之约 &amp; &lt;Promise&gt; &quot;Special&quot;"))
         assertTrue("OPF must contain modified date", opf.contains("dcterms:modified"))
+        assertFalse("Package element should not have redundant toc attribute", opf.contains("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"pub-id\" toc=\"ncx\">"))
+        assertTrue("Package element must define package without toc", opf.contains("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"pub-id\">"))
         assertTrue("OPF manifest must have nav", opf.contains("properties=\"nav\""))
         assertTrue("OPF manifest must have cover-image", opf.contains("properties=\"cover-image\""))
         assertTrue("OPF manifest must list chapter-001", opf.contains("id=\"chapter-001\""))
         assertTrue("OPF manifest must list chapter-002", opf.contains("id=\"chapter-002\""))
+        assertTrue("OPF spine must specify toc attribute", opf.contains("<spine toc=\"ncx\">"))
         assertTrue("OPF spine must reference cover", opf.contains("idref=\"cover\""))
         assertTrue("OPF spine must reference chapter-001", opf.contains("idref=\"chapter-001\""))
         assertTrue("OPF spine must reference chapter-002", opf.contains("idref=\"chapter-002\""))
@@ -336,5 +339,30 @@ class EpubExporterTest {
             "Could not export EPUB: Unknown error",
             localized("导出 EPUB 失败：未知错误", lang),
         )
+    }
+
+    @Test
+    fun filterExportableChapters_returnsActiveNonBlankChaptersInStoryOrder() {
+        val ch1 = ChapterEntity(id = "ch-1", novelId = "n1", storyOrder = 10, content = "第十章内容")
+        val ch2 = ChapterEntity(id = "ch-2", novelId = "n1", storyOrder = 2, content = "第二章内容")
+        val blank = ChapterEntity(id = "ch-blank", novelId = "n1", storyOrder = 1, content = "   \n\t")
+        val deleted = ChapterEntity(id = "ch-deleted", novelId = "n1", storyOrder = 0, content = "已删除", deleted = true)
+
+        val result = EpubExporter.filterExportableChapters(listOf(ch1, deleted, blank, ch2))
+
+        assertEquals(2, result.size)
+        assertEquals("ch-2", result[0].id)
+        assertEquals("ch-1", result[1].id)
+    }
+
+    @Test
+    fun filterExportableChapters_whenNoExportableChapters_throwsIllegalArgumentException() {
+        val blank = ChapterEntity(id = "ch-blank", novelId = "n1", storyOrder = 1, content = "")
+        val deleted = ChapterEntity(id = "ch-del", novelId = "n1", storyOrder = 2, content = "删除", deleted = true)
+
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            EpubExporter.filterExportableChapters(listOf(blank, deleted))
+        }
+        assertEquals("还没有可导出的正文内容", ex.message)
     }
 }

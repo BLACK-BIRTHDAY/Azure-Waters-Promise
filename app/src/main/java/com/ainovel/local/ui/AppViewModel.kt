@@ -925,15 +925,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         flushAutosaveNow()
         val targetNovelId = novelId ?: error("请先选择作品")
         val novel = novelRepository.novel(targetNovelId) ?: error("作品不存在")
-        val chapters = novelRepository.allChapters(targetNovelId).filter { !it.deleted }
-        val coverBytes = novel.coverFileName?.let { fileName ->
-            container.coverStorage.file(fileName)?.takeIf { it.exists() }?.readBytes()
-        }
+        val chapters = novelRepository.allChapters(targetNovelId)
+        val exportableChapters = EpubExporter.filterExportableChapters(chapters)
         withContext(Dispatchers.IO) {
+            val coverBytes = novel.coverFileName?.let { fileName ->
+                container.coverStorage.file(fileName)?.takeIf { it.exists() }?.readBytes()
+            }
             output.use { stream ->
                 EpubExporter.export(
                     novel = novel,
-                    chapters = chapters,
+                    chapters = exportableChapters,
                     coverBytes = coverBytes,
                     output = stream,
                 )
@@ -944,23 +945,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportNovelEpub(uri: Uri, novelId: String? = selectedNovelId.value) = launchAction("导出 EPUB 失败") {
         flushAutosaveNow()
-        val resolver = getApplication<Application>().contentResolver
-        resolver.openOutputStream(uri, "w")?.use { output ->
-            val targetNovelId = novelId ?: error("请先选择作品")
-            val novel = novelRepository.novel(targetNovelId) ?: error("作品不存在")
-            val chapters = novelRepository.allChapters(targetNovelId).filter { !it.deleted }
+        val targetNovelId = novelId ?: error("请先选择作品")
+        val novel = novelRepository.novel(targetNovelId) ?: error("作品不存在")
+        val chapters = novelRepository.allChapters(targetNovelId)
+        val exportableChapters = EpubExporter.filterExportableChapters(chapters)
+        withContext(Dispatchers.IO) {
             val coverBytes = novel.coverFileName?.let { fileName ->
                 container.coverStorage.file(fileName)?.takeIf { it.exists() }?.readBytes()
             }
-            withContext(Dispatchers.IO) {
+            val resolver = getApplication<Application>().contentResolver
+            resolver.openOutputStream(uri, "w")?.use { output ->
                 EpubExporter.export(
                     novel = novel,
-                    chapters = chapters,
+                    chapters = exportableChapters,
                     coverBytes = coverBytes,
                     output = output,
                 )
-            }
-        } ?: error("无法写入选定位置")
+            } ?: error("无法写入选定位置")
+        }
         _messages.emit(UiMessage.Info("EPUB 电子书已导出"))
     }
 

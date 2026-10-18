@@ -19,17 +19,21 @@ object EpubExporter {
         val bytes: ByteArray,
     )
 
+    fun filterExportableChapters(chapters: List<ChapterEntity>): List<ChapterEntity> {
+        val activeChapters = chapters
+            .filter { !it.deleted && it.content.isNotBlank() }
+            .sortedBy { it.storyOrder }
+        require(activeChapters.isNotEmpty()) { "还没有可导出的正文内容" }
+        return activeChapters
+    }
+
     fun export(
         novel: NovelEntity,
         chapters: List<ChapterEntity>,
         coverBytes: ByteArray? = null,
         output: OutputStream,
     ) {
-        val activeChapters = chapters
-            .filter { !it.deleted && it.content.isNotBlank() }
-            .sortedBy { it.storyOrder }
-
-        require(activeChapters.isNotEmpty()) { "还没有可导出的正文内容" }
+        val activeChapters = filterExportableChapters(chapters)
 
         val coverInfo = coverBytes?.takeIf { it.isNotEmpty() }?.let { detectCover(it) }
 
@@ -331,7 +335,7 @@ $navPoints
         }
 
         val xml = """<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" toc="ncx">
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <dc:identifier id="pub-id">urn:uuid:${novel.id}</dc:identifier>
         <dc:title>$escapedTitle</dc:title>
