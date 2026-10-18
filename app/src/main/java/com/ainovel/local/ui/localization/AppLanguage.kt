@@ -478,9 +478,45 @@ private val exactEnglish = mapOf(
     "恢复推荐选择" to "Restore recommended selection",
     "显示 API Key" to "Show API key",
     "隐藏 API Key" to "Hide API key",
+    "Google Cloud Vertex AI" to "Google Cloud Vertex AI",
+    "Gemini / Vertex AI 原生" to "Native Gemini / Vertex AI",
+    "Vertex AI 原生" to "Native Vertex AI",
+    "支持 Gemini API Key，或直接粘贴 / 导入 Google Cloud Vertex AI 服务账号 JSON 凭证。" to "Supports Gemini API keys or directly pasting / importing Google Cloud Vertex AI service account JSON credentials.",
+    "导入或粘贴 Google Cloud 服务账号 (Service Account) JSON 密钥，自动签发 OAuth2 令牌并填充项目地址。" to "Import or paste a Google Cloud Service Account JSON key to automatically issue OAuth2 tokens and populate the project URL.",
+    "导入服务账号 JSON" to "Import Service Account JSON",
+    "API Key 或服务账号 JSON" to "API Key or Service Account JSON",
+    "新 API Key 或服务账号 JSON（留空表示不修改）" to "New API key or Service Account JSON (leave blank to keep the current key)",
+    "服务账号 JSON 或 API Key" to "Service Account JSON or API Key",
+    "新服务账号 JSON 或 API Key（留空表示不修改）" to "New Service Account JSON or API key (leave blank to keep the current key)",
+    "已成功导入服务账号 JSON" to "Service account JSON imported successfully",
+    "导入服务账号 JSON 失败" to "Failed to import service account JSON",
+    "服务账号内容必须为 JSON 对象" to "Service account content must be a JSON object",
+    "检测到 OAuth 客户端 JSON 而非服务账号（Service Account）密钥 JSON，请导入包含 private_key 与 client_email 的服务账号 JSON" to "Detected OAuth client JSON instead of Service Account key JSON. Please import a service account JSON containing private_key and client_email",
+    "服务账号 JSON 缺少 project_id" to "Service account JSON missing project_id",
+    "服务账号 JSON 缺少 client_email" to "Service account JSON missing client_email",
+    "服务账号 JSON 缺少有效的 private_key（需包含 PEM 格式私钥）" to "Service account JSON missing valid private_key (must contain PEM format private key)",
+    "OAuth2 响应缺少 access_token" to "OAuth2 response missing access_token",
 )
 
 private fun translateDynamicText(source: String): String {
+    Regex("""^已加载服务账号：(.+)（项目：(.+)）$""").matchEntire(source)?.let {
+        return "Loaded service account: ${it.groupValues[1]} (project: ${it.groupValues[2]})"
+    }
+    Regex("""^服务账号 JSON 格式错误：(.*)$""").matchEntire(source)?.let {
+        return "Invalid service account JSON format: ${it.groupValues[1]}"
+    }
+    Regex("""^服务账号凭证解析失败：(.*)$""").matchEntire(source)?.let {
+        return "Failed to parse service account credentials: ${it.groupValues[1]}"
+    }
+    Regex("""^获取 Google OAuth2 访问令牌失败：(.*)$""").matchEntire(source)?.let {
+        return "Failed to acquire Google OAuth2 access token: ${it.groupValues[1]}"
+    }
+    Regex("""^无法连接 Google OAuth2 服务器：(.*)$""").matchEntire(source)?.let {
+        return "Unable to connect to Google OAuth2 server: ${it.groupValues[1]}"
+    }
+    Regex("""^Google 服务账号认证失败（HTTP (\d+)）：(.*)$""").matchEntire(source)?.let {
+        return "Google service account authentication failed (HTTP ${it.groupValues[1]}): ${it.groupValues[2]}"
+    }
     Regex("""^(\d+) 本作品$""").matchEntire(source)?.let { return "${it.groupValues[1]} stories" }
     Regex("""^(\d+) 个候选待选择$""").matchEntire(source)?.let { return "${it.groupValues[1]} candidates awaiting selection" }
     Regex("""^候选 (\d+) · 还没有写入正文$""").matchEntire(source)?.let { return "Candidate ${it.groupValues[1]} · Not added to the chapter yet" }

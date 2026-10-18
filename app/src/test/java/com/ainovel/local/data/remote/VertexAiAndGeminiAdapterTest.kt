@@ -2,6 +2,8 @@ package com.ainovel.local.data.remote
 
 import com.ainovel.local.data.model.TaskType
 import com.ainovel.local.domain.GenerationRepository
+import com.ainovel.local.ui.localization.AppLanguage
+import com.ainovel.local.ui.localization.localized
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.security.KeyPair
@@ -1096,5 +1098,64 @@ class VertexAiAndGeminiAdapterTest {
         )
         val proJson = json.parseToJsonElement(proPrepared.serializedRequestBody).jsonObject
         assertNull(proJson["generationConfig"]?.jsonObject?.get("thinkingConfig"))
+    }
+
+    @Test
+    fun testVertexAiAndGeminiLocalization() {
+        // ProviderCatalog labels and notes
+        assertEquals("Google Cloud Vertex AI", localized("Google Cloud Vertex AI", AppLanguage.ENGLISH))
+        assertEquals("Native Gemini / Vertex AI", localized("Gemini / Vertex AI 原生", AppLanguage.ENGLISH))
+        assertEquals("Native Vertex AI", localized("Vertex AI 原生", AppLanguage.ENGLISH))
+        assertEquals(
+            "Supports Gemini API keys or directly pasting / importing Google Cloud Vertex AI service account JSON credentials.",
+            localized("支持 Gemini API Key，或直接粘贴 / 导入 Google Cloud Vertex AI 服务账号 JSON 凭证。", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Import or paste a Google Cloud Service Account JSON key to automatically issue OAuth2 tokens and populate the project URL.",
+            localized("导入或粘贴 Google Cloud 服务账号 (Service Account) JSON 密钥，自动签发 OAuth2 令牌并填充项目地址。", AppLanguage.ENGLISH)
+        )
+
+        // SettingsScreen action button and labels
+        assertEquals("Import Service Account JSON", localized("导入服务账号 JSON", AppLanguage.ENGLISH))
+        assertEquals("API Key or Service Account JSON", localized("API Key 或服务账号 JSON", AppLanguage.ENGLISH))
+        assertEquals(
+            "New API key or Service Account JSON (leave blank to keep the current key)",
+            localized("新 API Key 或服务账号 JSON（留空表示不修改）", AppLanguage.ENGLISH)
+        )
+        assertEquals("Service Account JSON or API Key", localized("服务账号 JSON 或 API Key", AppLanguage.ENGLISH))
+        assertEquals(
+            "New Service Account JSON or API key (leave blank to keep the current key)",
+            localized("新服务账号 JSON 或 API Key（留空表示不修改）", AppLanguage.ENGLISH)
+        )
+
+        // Dynamic service account loaded string
+        assertEquals(
+            "Loaded service account: sa-test@my-project.iam.gserviceaccount.com (project: my-project)",
+            localized("已加载服务账号：sa-test@my-project.iam.gserviceaccount.com（项目：my-project）", AppLanguage.ENGLISH)
+        )
+
+        // Dynamic error message patterns
+        assertEquals(
+            "Invalid service account JSON format: missing brace",
+            localized("服务账号 JSON 格式错误：missing brace", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Failed to parse service account credentials: invalid key",
+            localized("服务账号凭证解析失败：invalid key", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Failed to acquire Google OAuth2 access token: network error",
+            localized("获取 Google OAuth2 访问令牌失败：network error", AppLanguage.ENGLISH)
+        )
+        assertEquals(
+            "Google service account authentication failed (HTTP 401): invalid_grant",
+            localized("Google 服务账号认证失败（HTTP 401）：invalid_grant", AppLanguage.ENGLISH)
+        )
+
+        // Simplified Chinese returns original text unchanged
+        assertEquals(
+            "已加载服务账号：sa-test@my-project.iam.gserviceaccount.com（项目：my-project）",
+            localized("已加载服务账号：sa-test@my-project.iam.gserviceaccount.com（项目：my-project）", AppLanguage.SIMPLIFIED_CHINESE)
+        )
     }
 }
