@@ -423,6 +423,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _messages.emit(UiMessage.Info("章节已经回来了；相关总结仍需要重新整理"))
     }
 
+    fun permanentlyDeleteChapter(chapterId: String) = launchAction("彻底删除章节失败") {
+        flushAutosaveNow()
+        novelRepository.permanentlyDeleteChapter(chapterId)
+        if (selectedChapterId.value == chapterId) selectedChapterId.value = null
+        _messages.emit(UiMessage.Info("章节已彻底删除"))
+    }
+
     fun moveChapter(chapterId: String, direction: Int) = launchAction("调整章节顺序失败") {
         flushAutosaveNow()
         val active = workspace.value.chapters
@@ -770,8 +777,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         novelRepository.setSummaryIncluded(summary.id, !summary.includeInContext)
     }
 
-    fun updateSummary(summaryId: String, content: String) = launchAction("保存总结失败") {
-        novelRepository.updateSummaryContent(summaryId, content)
+    fun updateSummary(summaryId: String, name: String, content: String) = launchAction("保存总结失败") {
+        novelRepository.updateSummary(summaryId, name, content)
+    }
+
+    fun deleteSummary(summaryId: String) = launchAction("删除总结失败") {
+        novelRepository.deleteSummary(summaryId)
+        _messages.emit(UiMessage.Info("总结已删除"))
     }
 
     fun loadDefaultSummarySources() = launchAction("读取总结来源失败") {

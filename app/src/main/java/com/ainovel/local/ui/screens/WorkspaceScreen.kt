@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ainovel.local.data.model.CandidateEntity
@@ -109,6 +110,8 @@ import com.ainovel.local.ui.components.SecondaryAction
 import com.ainovel.local.ui.components.StatusPill
 import com.ainovel.local.ui.components.StatusTone
 import kotlinx.coroutines.launch
+
+internal const val CHAPTER_RAIL_EXPANDED_WIDTH_DP = 332
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -159,8 +162,9 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                         onMove = viewModel::moveChapter,
                         onDelete = viewModel::softDeleteChapter,
                         onRestore = viewModel::restoreChapter,
+                        onPermanentDelete = viewModel::permanentlyDeleteChapter,
                         onExportEpub = onExportEpub,
-                        modifier = Modifier.width(232.dp).fillMaxHeight(),
+                        modifier = Modifier.width(CHAPTER_RAIL_EXPANDED_WIDTH_DP.dp).fillMaxHeight(),
                     )
                     VerticalDivider()
                 }
@@ -301,6 +305,7 @@ fun WorkspaceScreen(viewModel: AppViewModel, imeVisible: Boolean) {
                 onMove = viewModel::moveChapter,
                 onDelete = viewModel::softDeleteChapter,
                 onRestore = viewModel::restoreChapter,
+                onPermanentDelete = viewModel::permanentlyDeleteChapter,
                 onExportEpub = {
                     onExportEpub()
                     showChapters = false
@@ -320,10 +325,12 @@ private fun ChapterRail(
     onMove: (String, Int) -> Unit,
     onDelete: (String) -> Unit,
     onRestore: (String) -> Unit,
+    onPermanentDelete: (String) -> Unit,
     onExportEpub: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var deleteTarget by remember { mutableStateOf<ChapterEntity?>(null) }
+    var permanentDeleteTarget by remember { mutableStateOf<ChapterEntity?>(null) }
     Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -343,7 +350,7 @@ private fun ChapterRail(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -351,29 +358,44 @@ private fun ChapterRail(
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             chapter.name?.takeIf { it.isNotBlank() } ?: "未命名章节",
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
                         if (chapter.includeInContext) {
+                            Spacer(Modifier.width(4.dp))
                             Icon(
                                 Icons.Outlined.CheckCircleOutline,
                                 contentDescription = "已纳入上下文",
-                                modifier = Modifier.size(17.dp),
+                                modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.secondary,
                             )
                         }
-                        IconButton(onClick = { onMove(chapter.id, -1) }, enabled = index > 0) {
-                            Icon(Icons.Outlined.ArrowUpward, contentDescription = "上移章节")
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { onMove(chapter.id, -1) },
+                            enabled = index > 0,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Outlined.ArrowUpward, contentDescription = "上移章节", modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = { onMove(chapter.id, 1) }, enabled = index < state.chapters.lastIndex) {
-                            Icon(Icons.Outlined.ArrowDownward, contentDescription = "下移章节")
+                        IconButton(
+                            onClick = { onMove(chapter.id, 1) },
+                            enabled = index < state.chapters.lastIndex,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Outlined.ArrowDownward, contentDescription = "下移章节", modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = { deleteTarget = chapter }, enabled = state.chapters.size > 1) {
-                            Icon(Icons.Outlined.DeleteOutline, contentDescription = "移入章节回收区")
+                        IconButton(
+                            onClick = { deleteTarget = chapter },
+                            enabled = state.chapters.size > 1,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Outlined.DeleteOutline, contentDescription = "移入章节回收区", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -385,9 +407,22 @@ private fun ChapterRail(
                 itemsIndexed(deletedChapters, key = { _, chapter -> chapter.id }) { _, chapter ->
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(12.dp)) {
                         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(chapter.name?.ifBlank { null } ?: "未命名章节", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                chapter.name?.ifBlank { null } ?: "未命名章节",
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             IconButton(onClick = { onRestore(chapter.id) }) {
                                 Icon(Icons.Outlined.RestoreFromTrash, contentDescription = "恢复章节")
+                            }
+                            IconButton(onClick = { permanentDeleteTarget = chapter }) {
+                                Icon(
+                                    Icons.Outlined.DeleteOutline,
+                                    contentDescription = "彻底删除章节",
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
                             }
                         }
                     }
@@ -402,6 +437,22 @@ private fun ChapterRail(
             text = { Text("章节会暂时收进回收区，正文、版本与创作记录都不会丢失。它将不再参与后续生成，依赖它的总结也会失效；恢复章节后，需要重新整理这些总结。") },
             confirmButton = { TextButton(onClick = { onDelete(chapter.id); deleteTarget = null }) { Text("移入回收区") } },
             dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } },
+        )
+    }
+    permanentDeleteTarget?.let { chapter ->
+        AlertDialog(
+            onDismissRequest = { permanentDeleteTarget = null },
+            title = { Text("彻底删除章节？") },
+            text = { Text("彻底删除后，该章节的正文与版本将永久移除，无法恢复。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onPermanentDelete(chapter.id)
+                        permanentDeleteTarget = null
+                    },
+                ) { Text("彻底删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { permanentDeleteTarget = null }) { Text("取消") } },
         )
     }
 }

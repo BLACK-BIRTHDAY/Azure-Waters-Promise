@@ -167,6 +167,14 @@ private val exactEnglish = mapOf(
     "移入章节回收区" to "Move chapter to trash",
     "移入回收区" to "Move to trash",
     "将章节移入回收区？" to "Move this chapter to trash?",
+    "编辑章节标题" to "Edit chapter title",
+    "彻底删除章节" to "Permanently delete chapter",
+    "彻底删除章节？" to "Permanently delete this chapter?",
+    "彻底删除" to "Delete permanently",
+    "彻底删除后，该章节的正文与版本将永久移除，无法恢复。" to "Once permanently deleted, this chapter's text and versions will be removed forever and cannot be recovered.",
+    "章节已彻底删除" to "Chapter permanently deleted",
+    "彻底删除章节失败" to "Could not permanently delete the chapter",
+    "只能彻底删除回收区中的章节" to "Only chapters in Trash can be permanently deleted",
     "章节会暂时收进回收区，正文、版本与创作记录都不会丢失。它将不再参与后续生成，依赖它的总结也会失效；恢复章节后，需要重新整理这些总结。" to "The chapter will be kept in Trash. Its text, versions, and writing history will remain intact, but it will no longer be used for generation and dependent summaries will become outdated. Restore it and refresh those summaries when needed.",
     "展开章节列表" to "Expand chapter list",
     "折叠章节列表" to "Collapse chapter list",
@@ -371,6 +379,13 @@ private val exactEnglish = mapOf(
     "简洁" to "Concise",
     "标准" to "Standard",
     "详细" to "Detailed",
+    "总结标题" to "Summary title",
+    "总结标题不能为空" to "Summary title cannot be empty",
+    "总结内容不能为空" to "Summary content cannot be empty",
+    "总结不存在" to "Summary not found",
+    "删除总结失败" to "Could not delete the summary",
+    "总结已删除" to "Summary deleted",
+    "删除后，这份总结会从故事记忆中移除；依赖它的后续总结会失效，过去的创作记录仍会保留。" to "This summary will be removed from story memory. Dependent summaries will become outdated, while past writing records will remain.",
     "总结正文" to "Summary text",
     "修改这份总结后，依赖它的后续总结会提醒你重新整理。" to "Editing this summary will mark dependent summaries for refresh.",
     "暂无正文" to "No chapter text",
@@ -550,6 +565,15 @@ private fun translateDynamicText(source: String): String {
     Regex("""^导出 EPUB 失败：(.*)$""").matchEntire(source)?.let {
         return "Could not export EPUB: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
     }
+    Regex("""^删除总结失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not delete the summary: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
+    Regex("""^保存总结失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not save the summary: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
+    Regex("""^彻底删除章节失败：(.*)$""").matchEntire(source)?.let {
+        return "Could not permanently delete the chapter: ${localized(it.groupValues[1], AppLanguage.ENGLISH)}"
+    }
     Regex("""^已加载服务账号：(.+)（项目：(.+)）$""").matchEntire(source)?.let {
         return "Loaded service account: ${it.groupValues[1]} (project: ${it.groupValues[2]})"
     }
@@ -636,6 +660,8 @@ private fun translateDynamicText(source: String): String {
         "中途停下" to "Stopped early",
         "未命名章节" to "Untitled chapter",
         "的更多操作" to " options",
+        "编辑 " to "Edit ",
+        "删除 " to "Delete ",
         "编辑" to "Edit ",
         "新建" to "New ",
         "删除“" to "Delete “",
